@@ -189,9 +189,10 @@ def _build_recommendation_prompt(inv: FileInventory, cap: RouteCapability) -> st
 def _call_gemini(prompt: str) -> str:
     """Vertex AI 経由で Gemini を呼び出す。認証未設定時はフォールバック。"""
 
-    # Vertex AI プロジェクト設定（.env から読み込み）
+    # Vertex AI 設定（.env から読み込み）
     project = os.environ.get("VERTEX_PROJECT")
     location = os.environ.get("VERTEX_LOCATION")
+    model = os.environ.get("VERTEX_MODEL", "gemini-2.0-flash")
 
     if not project or not location:
         print("\n[WARNING] .env に VERTEX_PROJECT / VERTEX_LOCATION が設定されていません。")
@@ -202,7 +203,7 @@ def _call_gemini(prompt: str) -> str:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
+            model=model,
             project=project,
             location=location,
         )
