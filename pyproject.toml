@@ -1,0 +1,11 @@
+[project]
+name = "agentic-uavcloud"
+version = "0.1.0"
+description = "Agentic drone data upload diagnostics using LangGraph + Gemini on Vertex AI"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.4",
+    "langchain-google-genai>=2.1",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+]

@@ -1,0 +1,18 @@
+# 環境変数 (シークレット・プロジェクト固有設定)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# uv / venv
+.venv/
+uv.lock
+
+# macOS
+.DS_Store
+
+# 配布物
+dist/
+*.egg-info/
