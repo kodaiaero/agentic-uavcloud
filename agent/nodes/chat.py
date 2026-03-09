@@ -34,12 +34,40 @@ def chat_loop(state: GraphState) -> dict:
     return {"user_input": user_input, "next_action": "chat"}
 
 
-def chat_respond(state: GraphState) -> dict:
-    """ユーザーの自由質問に Gemini で回答する。"""
-    history = list(state.chat_history)
-    history.append(HumanMessage(content=state.user_input))
+_TOOL_HINT_KEYWORDS = ["確認", "チェック", "問題", "品質", "中身", "解析", "調べ", "検証", "整合", "大丈夫"]
 
-    response_text = call_gemini_chat(history)
+
+def chat_respond(state: GraphState) -> dict:
+    """ユーザーの自由質問に Gemini で回答する。ファイル関連の質問にはツールを使う。"""
+    history = list(state.chat_history)
+    user_input = state.user_input
+
+    # ファイル品質に関する質問ならツール使用のヒントを付加
+    needs_tools = any(kw in user_input for kw in _TOOL_HINT_KEYWORDS)
+    if needs_tools:
+        inv = state.inventory
+        file_hint = []
+        if inv.timestamp:
+            file_hint.append(f"MRKファイル: {', '.join(inv.timestamp)}")
+        if inv.drone_obs:
+            file_hint.append(f"ドローンOBS: {', '.join(inv.drone_obs)} (location='root')")
+        if inv.base_obs:
+            file_hint.append(f"基準局OBS: {', '.join(inv.base_obs)} (location='base_station_logs')")
+        files_info = " / ".join(file_hint) if file_hint else ""
+
+        user_input_with_hint = (
+            f"{user_input}\n\n"
+            f"(システム注: この質問にはツールを function call で呼び出してください。テキストで説明せずツールを実行すること。"
+            f"利用可能ファイル: {files_info}。"
+            f"ユーザーにファイル名を聞き返さず、該当するファイルすべてに対してツールを呼んでください。)"
+        )
+        history.append(HumanMessage(content=user_input_with_hint))
+    else:
+        history.append(HumanMessage(content=user_input))
+
+    response_text = call_gemini_chat(history, enable_tools=needs_tools)
+    # 履歴にはオリジナルの入力を保持
+    history[-1] = HumanMessage(content=state.user_input)
     history.append(AIMessage(content=response_text))
 
     print(f"\n========== AI アドバイザー ==========\n{response_text}")

@@ -4,11 +4,13 @@ import sys
 from pathlib import Path
 
 from agent.state import FileInventory, RouteCapability, GraphState
+from agent.tools.file_analysis import set_target_dir
 
 
 def scan_files(state: GraphState) -> dict:
     """ディレクトリを走査し、ファイルをカテゴリ別に分類する。"""
     target = Path(state.target_dir)
+    set_target_dir(str(target))
     if not target.is_dir():
         print(f"\n[ERROR] ディレクトリが見つかりません: {target}")
         sys.exit(1)
