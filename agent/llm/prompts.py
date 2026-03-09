@@ -6,13 +6,19 @@ from agent.state import FileInventory, RouteCapability
 def build_system_prompt(inv: FileInventory, cap: RouteCapability) -> str:
     """Gemini に渡すシステムプロンプトを構築する。"""
 
+    # ファイル名リストを構築
+    drone_obs_names = ", ".join(inv.drone_obs) if inv.drone_obs else "なし"
+    timestamp_names = ", ".join(inv.timestamp) if inv.timestamp else "なし"
+    base_obs_names = ", ".join(inv.base_obs) if inv.base_obs else "なし"
+    marker_names = ", ".join(inv.markers) if inv.markers else "なし"
+
     file_status = f"""\
 ## アップロード済みファイル状況
 - 撮影画像 (photos/): {len(inv.images)}枚 {'✓' if inv.images else '✗ 未検出'}
-- ドローンOBS観測データ (.obs): {len(inv.drone_obs)}件 {'✓' if inv.drone_obs else '✗ 未検出'}
-- タイムスタンプ (.MRK): {len(inv.timestamp)}件 {'✓' if inv.timestamp else '✗ 未検出'}
-- 基準局OBSデータ (base_station_logs/*.obs): {len(inv.base_obs)}件 {'✓' if inv.base_obs else '✗ 未検出'}
-- 検証マーカーログ (aerobo_marker_logs/*.log): {len(inv.markers)}件 {'✓' if inv.markers else '✗ 未検出'}"""
+- ドローンOBS観測データ (.obs): {len(inv.drone_obs)}件 {'✓' if inv.drone_obs else '✗ 未検出'} — ファイル名: {drone_obs_names}
+- タイムスタンプ (.MRK): {len(inv.timestamp)}件 {'✓' if inv.timestamp else '✗ 未検出'} — ファイル名: {timestamp_names}
+- 基準局OBSデータ (base_station_logs/*.obs): {len(inv.base_obs)}件 {'✓' if inv.base_obs else '✗ 未検出'} — ファイル名: {base_obs_names}
+- 検証マーカーログ (aerobo_marker_logs/*.log): {len(inv.markers)}件 {'✓' if inv.markers else '✗ 未検出'} — ファイル名: {marker_names}"""
 
     route_status = f"""\
 ## 各処理ルートの実行可否
@@ -38,9 +44,20 @@ def build_system_prompt(inv: FileInventory, cap: RouteCapability) -> str:
 - SfM (Structure from Motion): 多数の写真からカメラ位置を推定し、3D点群やオルソ画像を生成する技術。
 - PPK (Post-Processed Kinematic): 飛行後にドローンOBSと基準局OBSを基線解析し、センチメートル級の測位精度を実現する手法。
 
+## 利用可能なツール
+あなたは以下のツールを呼び出して、実際のファイル内容を調べることができます:
+- check_mrk_file(filename): MRKファイルの内容を解析。filenameには上記のMRKファイル名をそのまま指定。
+- check_obs_file(filename, location): OBSファイルのヘッダーを解析。locationは "root"（ドローンOBS）または "base_station_logs"（基準局OBS）。
+- validate_data_consistency(): 画像枚数とMRK数の整合性、OBS観測時間の十分性を一括チェック。引数不要。
+
+## ツール使用の重要ルール
+- ファイルの中身・品質・整合性について質問された場合は、ユーザーにファイル名を聞き返さず、上記のファイル一覧から該当ファイル名を特定し、即座にツールを呼び出してください。
+- 「データに問題ない？」「このファイルの中身を見て」等の質問には、必ずツールで実データを確認してから回答してください。
+
 ## 回答ルール
 1. 質問に対して簡潔・正確に日本語で回答してください。
 2. 上位ルートに進むために「何が足りないか」を聞かれた場合、ファイル種別・格納先フォルダ名・取得方法を具体的に説明してください。
 3. ファイルの用途を聞かれた場合、ドメイン知識に基づいて実務的に分かりやすく説明してください。
-4. 箇条書きを活用し、長くなりすぎないようにまとめてください。
-5. 推奨ルートを提案する際は、理由も簡潔に述べてください。"""
+4. ファイルの中身や品質を聞かれた場合、必ずツールを使って確認した上で回答してください。
+5. 箇条書きを活用し、長くなりすぎないようにまとめてください。
+6. 推奨ルートを提案する際は、理由も簡潔に述べてください。"""
