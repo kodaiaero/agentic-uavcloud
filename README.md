@@ -75,7 +75,7 @@ your_drone_data/
 | 役割 | ライブラリ / サービス |
 |---|---|
 | Agentワークフロー | [LangGraph](https://github.com/langchain-ai/langgraph) |
-| LLM | Gemini 2.0 Flash (Google Vertex AI) |
+| LLM | Gemini 2.5 Flash (Google Vertex AI) |
 | LLM クライアント | [langchain-google-genai](https://github.com/langchain-ai/langchain-google) |
 | Tool Use | LangChain `@tool` + `bind_tools()` (ReActループ) |
 | データモデル | [Pydantic v2](https://docs.pydantic.dev/) |
@@ -164,7 +164,7 @@ cp .env.example .env
 ```env
 VERTEX_PROJECT=your-gcp-project-id
 VERTEX_LOCATION=us-central1
-VERTEX_MODEL=gemini-2.0-flash
+VERTEX_MODEL=gemini-2.5-flash
 ```
 
 ### 4. Vertex AI 認証
