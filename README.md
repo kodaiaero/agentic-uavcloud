@@ -1,165 +1,165 @@
 # Agentic UAV Cloud
 
-ドローン測量データのアップロード状況を診断し、最適な処理パスを提案・実行する **CLIベースのPoC** です。
-[LangGraph](https://github.com/langchain-ai/langgraph) と [Gemini (Vertex AI)](https://cloud.google.com/vertex-ai) を組み合わせたAgentic AIアーキテクチャで構成されています。
+A **CLI-based PoC** that diagnoses the upload status of drone survey data and suggests/executes optimal processing paths.
+Built on an Agentic AI architecture combining [LangGraph](https://github.com/langchain-ai/langgraph) and [Gemini (Vertex AI)](https://cloud.google.com/vertex-ai).
 
 ---
 
-## 概要
+## Overview
 
-ユーザーが指定したディレクトリをスキャンし、含まれるファイル種別に応じて **「今何ができるか」** と **「上位処理に進むために何が足りないか」** を Gemini が日本語でガイドします。
-対話モードではユーザーの自由な質問に回答するほか、Gemini が **Tool Use（ReActパターン）** でファイルの中身を自律的に解析し、データ品質の問題を検出・報告します。
+Scans a user-specified directory and, based on the file types found, Gemini guides you in English on **"what can be done now"** and **"what is missing to proceed to higher-level processing"**.
+In interactive mode, the agent answers free-form questions. Gemini also autonomously analyzes file contents via **Tool Use (ReAct pattern)** to detect and report data quality issues.
 
 ```
-指定ディレクトリ
-  → ファイルスキャン
-  → 処理ルート判定（A〜D）
-  → Gemini による初回診断・提案
-  → 対話ループ（質問 / ルート実行 / 再スキャン）
-      └─ ファイル品質の質問 → Gemini がツールを自律呼び出しして回答
+Specified directory
+  → File scan
+  → Processing route determination (A–D)
+  → Initial diagnosis & recommendations by Gemini
+  → Interactive loop (questions / route execution / rescan)
+      └─ File quality questions → Gemini autonomously calls tools to answer
 ```
 
 ---
 
-## 主な機能
+## Key Features
 
-### 1. ファイルスキャン＆ルート判定
-ディレクトリ内のファイルを5カテゴリに自動分類し、処理ルートA〜Dの実行可否を判定します。
+### 1. File Scan & Route Determination
+Automatically classifies files in a directory into 5 categories and determines which processing routes A–D are executable.
 
-### 2. 対話モード（チャットループ）
-初回診断後、以下の操作を繰り返し実行できます：
-- **自由質問** — Gemini がドローン測量の専門知識に基づいて回答
-- **ルート実行** — A / B / C / D を入力してモック実行
-- **再スキャン** — ファイルを追加・修正した後に `rescan` で再判定
-- **終了** — `quit` で終了
+### 2. Interactive Mode (Chat Loop)
+After the initial diagnosis, the following operations can be performed repeatedly:
+- **Free questions** — Gemini answers based on drone survey expertise
+- **Route execution** — Enter A / B / C / D to trigger a mock execution
+- **Rescan** — After adding or modifying files, type `rescan` to re-evaluate
+- **Exit** — Type `quit` to exit
 
-### 3. Tool Use（ReActパターン）
-ファイルの品質・整合性に関する質問を検出すると、Gemini が以下のツールを自律的に呼び出して実データを確認してから回答します：
+### 3. Tool Use (ReAct Pattern)
+When a question about file quality or consistency is detected, Gemini autonomously calls the following tools to inspect real data before responding:
 
-| ツール | 機能 |
+| Tool | Function |
 |---|---|
-| `check_mrk_file` | MRKファイルのエントリ数・時間範囲・座標範囲・精度統計を解析 |
-| `check_obs_file` | OBS（RINEX）ファイルのヘッダーを解析し、観測時間・衛星システム・ファイルサイズを返す |
-| `validate_data_consistency` | 画像枚数とMRK数の整合性、OBS観測時間の十分性、ファイルサイズの妥当性を一括チェック |
+| `check_mrk_file` | Analyzes entry count, time range, coordinate range, and accuracy statistics of MRK files |
+| `check_obs_file` | Parses OBS (RINEX) file headers, returning observation time, satellite systems, and file size |
+| `validate_data_consistency` | Batch-checks image count vs. MRK count consistency, OBS observation duration sufficiency, and file size validity |
 
 ---
 
-## 処理ルート
+## Processing Routes
 
-アップロードされたファイル構成に応じて、実行可能な処理ルートが自動判定されます。
+Executable processing routes are automatically determined based on the uploaded file structure.
 
-| ルート | 名称 | 必要なファイル |
+| Route | Name | Required Files |
 |---|---|---|
-| **A** | 簡易写真処理 | 撮影画像 (`photos/`) |
-| **B** | 高精度基線解析 | Drone OBS (`.obs`) + 基準局 OBS (`base_station_logs/*.obs`) |
-| **C** | フルPPK写真処理 | ルートBの条件 + 撮影画像 + タイムスタンプ (`.MRK`) |
-| **D** | 精度検証付き処理 | ルートCの条件 + 検証マーカーログ (`aerobo_marker_logs/*.log`) |
+| **A** | Simple Photo Processing | Captured images (`photos/`) |
+| **B** | High-Precision Baseline Analysis | Drone OBS (`.obs`) + Base station OBS (`base_station_logs/*.obs`) |
+| **C** | Full PPK Photo Processing | Route B requirements + captured images + timestamps (`.MRK`) |
+| **D** | Processing with Accuracy Verification | Route C requirements + verification marker logs (`aerobo_marker_logs/*.log`) |
 
-### 期待するディレクトリ構成（フル構成）
+### Expected Directory Structure (Full Configuration)
 
 ```
 your_drone_data/
-├── photos/                    # 撮影画像
+├── photos/                    # Captured images
 ├── base_station_logs/
-│   └── *.obs                  # 基準局OBSデータ
+│   └── *.obs                  # Base station OBS data
 ├── aerobo_marker_logs/
-│   └── *.log                  # 検証マーカーログ
-├── *.obs                      # ドローンOBS観測データ
-└── *.MRK                      # タイムスタンプ
+│   └── *.log                  # Verification marker logs
+├── *.obs                      # Drone OBS observation data
+└── *.MRK                      # Timestamps
 ```
 
 ---
 
-## 技術スタック
+## Tech Stack
 
-| 役割 | ライブラリ / サービス |
+| Role | Library / Service |
 |---|---|
-| Agentワークフロー | [LangGraph](https://github.com/langchain-ai/langgraph) |
+| Agent Workflow | [LangGraph](https://github.com/langchain-ai/langgraph) |
 | LLM | Gemini 2.5 Flash (Google Vertex AI) |
-| LLM クライアント | [langchain-google-genai](https://github.com/langchain-ai/langchain-google) |
-| Tool Use | LangChain `@tool` + `bind_tools()` (ReActループ) |
-| データモデル | [Pydantic v2](https://docs.pydantic.dev/) |
-| 環境変数管理 | [python-dotenv](https://github.com/theskumar/python-dotenv) |
-| パッケージ管理 | [uv](https://github.com/astral-sh/uv) |
-| 言語 | Python 3.12+ |
+| LLM Client | [langchain-google-genai](https://github.com/langchain-ai/langchain-google) |
+| Tool Use | LangChain `@tool` + `bind_tools()` (ReAct loop) |
+| Data Model | [Pydantic v2](https://docs.pydantic.dev/) |
+| Environment Variables | [python-dotenv](https://github.com/theskumar/python-dotenv) |
+| Package Manager | [uv](https://github.com/astral-sh/uv) |
+| Language | Python 3.12+ |
 
 ---
 
-## アーキテクチャ
+## Architecture
 
-### LangGraphワークフロー
+### LangGraph Workflow
 
 ```
 START
-  └─► scan_files                    # ディレクトリ走査・ファイル分類
-        └─► analyze_capability      # ルートA〜D の実行可否判定
-              └─► recommend_agent   # Gemini による初回診断・提案
-                    └─► chat_loop   # ユーザー入力を待機
+  └─► scan_files                    # Directory scan & file classification
+        └─► analyze_capability      # Determine executable routes A–D
+              └─► recommend_agent   # Initial diagnosis & recommendations by Gemini
+                    └─► chat_loop   # Wait for user input
                           │ (conditional)
                 ┌─────────┼─────────────┬──────────┐
                 ↓         ↓             ↓          ↓
           chat_respond  execute_mock  rescan_notify  END
               │             │             │
-              └─► chat_loop └─► END       └─► scan_files (ループ)
+              └─► chat_loop └─► END       └─► scan_files (loop)
 ```
 
-### プロジェクト構成
+### Project Structure
 
 ```
 agentic-uavcloud/
-├── main.py                          # CLIエントリーポイント
-├── pyproject.toml                   # プロジェクト設定・依存関係 (uv)
-├── .env                             # 環境変数（Gitに含めない）
-├── .env.example                     # 環境変数のテンプレート
+├── main.py                          # CLI entry point
+├── pyproject.toml                   # Project config & dependencies (uv)
+├── .env                             # Environment variables (not in Git)
+├── .env.example                     # Environment variable template
 ├── .gitignore
 └── agent/
-    ├── __init__.py                  # build_graph をエクスポート
-    ├── graph.py                     # LangGraphワークフロー定義
-    ├── state.py                     # Pydantic状態モデル
+    ├── __init__.py                  # Exports build_graph
+    ├── graph.py                     # LangGraph workflow definition
+    ├── state.py                     # Pydantic state model
     ├── llm/
-    │   ├── client.py                # Gemini呼び出し + ReActループ
-    │   └── prompts.py               # システムプロンプト構築
+    │   ├── client.py                # Gemini invocation + ReAct loop
+    │   └── prompts.py               # System prompt construction
     ├── nodes/
-    │   ├── scan.py                  # ファイルスキャン・ルート判定
-    │   ├── recommend.py             # 初回診断・提案
-    │   ├── chat.py                  # 対話ループ・ツールヒント注入
-    │   └── execute.py               # ルートモック実行
+    │   ├── scan.py                  # File scan & route determination
+    │   ├── recommend.py             # Initial diagnosis & recommendations
+    │   ├── chat.py                  # Interactive loop & tool hint injection
+    │   └── execute.py               # Route mock execution
     └── tools/
-        ├── __init__.py              # ALL_TOOLS をエクスポート
-        └── file_analysis.py         # MRK/OBS解析・整合性チェックツール
+        ├── __init__.py              # Exports ALL_TOOLS
+        └── file_analysis.py         # MRK/OBS analysis & consistency check tools
 ```
 
 ---
 
-## セットアップ
+## Setup
 
-### 前提条件
+### Prerequisites
 
-- Python 3.12 以上
-- [uv](https://github.com/astral-sh/uv) インストール済み
-- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) インストール済み
-- Vertex AI API が有効なGCPプロジェクト
+- Python 3.12 or higher
+- [uv](https://github.com/astral-sh/uv) installed
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) installed
+- A GCP project with the Vertex AI API enabled
 
-### 1. リポジトリをクローン
+### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd agentic-uavcloud
 ```
 
-### 2. 依存関係のインストール
+### 2. Install Dependencies
 
 ```bash
 uv sync
 ```
 
-### 3. 環境変数の設定
+### 3. Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-`.env` を開き、GCPプロジェクト情報を入力します：
+Open `.env` and fill in your GCP project information:
 
 ```env
 VERTEX_PROJECT=your-gcp-project-id
@@ -167,7 +167,7 @@ VERTEX_LOCATION=us-central1
 VERTEX_MODEL=gemini-2.5-flash
 ```
 
-### 4. Vertex AI 認証
+### 4. Authenticate with Vertex AI
 
 ```bash
 gcloud auth application-default login
@@ -175,52 +175,52 @@ gcloud auth application-default login
 
 ---
 
-## 実行方法
+## Usage
 
 ```bash
-uv run main.py <ドローンデータのディレクトリパス>
+uv run main.py <path-to-drone-data-directory>
 ```
 
-**例：**
+**Examples:**
 
 ```bash
-# 全ファイルが揃ったデータ（ルートD まで実行可能）
+# Full dataset (all routes up to D are available)
 uv run main.py /path/to/full_drone_data
 
-# 撮影画像のみのデータ（ルートA のみ実行可能）
+# Photos-only dataset (only Route A is available)
 uv run main.py /path/to/photos_only
 ```
 
-### 対話モードの操作
+### Interactive Mode Operations
 
 ```
-========== 対話モード ==========
-  ルート実行: A, B, C, D を入力
-  質問:       自由にテキストを入力
-  再スキャン: rescan と入力
-  終了:       quit と入力
-================================
+========== Interactive Mode ==========
+  Execute route: enter A, B, C, or D
+  Ask a question: type any free-form text
+  Rescan:         type rescan
+  Exit:           type quit
+======================================
 
-> データに問題ない？
-  🔧 ツール実行: validate_data_consistency({})
-  🔧 ツール実行: check_mrk_file({"filename": "20220607_0405_ASTimestamp.MRK"})
-  🔧 ツール実行: check_obs_file({"filename": "20220607_0405_ASRinexRtcm3.obs", "location": "root"})
+> Any issues with the data?
+  🔧 Tool call: validate_data_consistency({})
+  🔧 Tool call: check_mrk_file({"filename": "20220607_0405_ASTimestamp.MRK"})
+  🔧 Tool call: check_obs_file({"filename": "20220607_0405_ASRinexRtcm3.obs", "location": "root"})
 
-========== AI アドバイザー ==========
-データの品質チェック結果をお伝えします：
+========== AI Advisor ==========
+Here are the results of the data quality check:
 ...
-====================================
+================================
 ```
 
 ---
 
-## Vertex AI 認証について
+## About Vertex AI Authentication
 
-このプロジェクトは API キーではなく **Application Default Credentials (ADC)** を使用します。
-`gcloud auth application-default login` を一度実行しておくだけで、以降は自動的に認証が通ります。
+This project uses **Application Default Credentials (ADC)** rather than API keys.
+Run `gcloud auth application-default login` once, and authentication will be handled automatically from that point on.
 
-認証に失敗した場合は以下を確認してください：
+If authentication fails, check the following:
 
-1. `gcloud auth application-default login` を実行済みか
-2. `.env` の `VERTEX_PROJECT` が正しいか
-3. 該当プロジェクトで Vertex AI API が有効になっているか
+1. Have you run `gcloud auth application-default login`?
+2. Is `VERTEX_PROJECT` in `.env` correct?
+3. Is the Vertex AI API enabled for the specified project?
